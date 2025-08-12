@@ -1,104 +1,55 @@
 module top_level (
-    input  wire       dev_clk, // Clock de 25 MHz (da placa)
-    input  wire       rx,      // Entrada UART RX
-    output wire       tx,      // Saída UART TX
-    output wire       led_D2   // LED para debug (opcional)
+    input dev_clk,  // Clock da placa (25 MHz)
+    input rx,       // Entrada UART RX
+    output tx,      // Saída UART TX
+    output led_D2   // LED opcional (pode ignorar na simulação)
 );
 
-    wire clk_out, rst_out, n_rst_out;
-    wire fifo_empty, fifo_full, fifo_wr_en, fifo_rd_en;
-    wire [7:0] fifo_wr_data, fifo_rd_data;
-    wire uart_rx_valid, uart_tx_ready, uart_tx_en;
-    wire [7:0] uart_rx_data, uart_tx_data;
+wire clk;  // Clock dividido (153600 Hz)
+wire rst, n_rst;
 
-    // Divisor de clock (ajustado para 25 MHz da placa)
-    clock_div #(
-        .CLK_IN(25000000),  // Clock da placa (25 MHz)
-        .CLK_OUT(153600)    // Para 9600 baud com oversampling 16
-    ) clk_div_inst (
-        .clk_in(dev_clk),
-        .clk_out(clk_out)
-    );
+clock_div #(.CLK_IN(25000000), .CLK_OUT(153600)) clkdiv (
+    .clk_in(dev_clk),
+    .clk_out(clk)
+);
 
-    // Reset inicial
-    initial_rst rst_inst (
-        .clk_in(dev_clk),
-        .rst_out(rst_out),
-        .n_rst_out(n_rst_out)
-    );
+initial_rst rstgen (
+    .clk_in(clk),
+    .rst_out(rst),
+    .n_rst_out(n_rst)
+);
 
-    // FIFO síncrono
-    sync_fifo #(
-        .DATA_BITS(8),
-        .ADDRESS_BITS(10)
-    ) fifo_inst (
-        .clk_in(dev_clk),
-        .n_rst(n_rst_out),
-        .wr_en(fifo_wr_en),
-        .rd_en(fifo_rd_en),
-        .wr_data_in(fifo_wr_data),
-        .empty(fifo_empty),
-        .full(fifo_full),
-        .rd_data_out(fifo_rd_data)
-    );
+wire uart_rx_ready, uart_rx_valid;
+wire [7:0] uart_rx_data;
+uart_rx uart_rx_inst (
+    .clk_in(clk), .n_rst(n_rst), .rx(rx),
+    .ready_out(uart_rx_ready), .valid_out(uart_rx_valid), .data_out(uart_rx_data)
+);
 
-    // Receptor UART (usa clock dividido)
-    uart_rx #(
-        .DATA_BITS(8),
-        .STOP_BITS(1),
-        .OVERSAMPLING(16)
-    ) uart_rx_inst (
-        .clk_in(clk_out),
-        .n_rst(n_rst_out),
-        .rx(rx),
-        .ready_out(), // nao usado
-        .valid_out(uart_rx_valid),
-        .data_out(uart_rx_data)
-    );
+wire uart_tx_ready, uart_tx_en;
+wire [7:0] uart_tx_data;
+uart_tx uart_tx_inst (
+    .clk_in(clk), .n_rst(n_rst), .uart_en(uart_tx_en), .data_in(uart_tx_data),
+    .tx(tx), .ready_out(uart_tx_ready)
+);
 
-    // Transmissor UART (usa clock dividido)
-    uart_tx #(
-        .DATA_BITS(8),
-        .STOP_BITS(1),
-        .OVERSAMPLING(16)
-    ) uart_tx_inst (
-        .clk_in(clk_out),
-        .n_rst(n_rst_out),
-        .uart_en(uart_tx_en),
-        .data_in(uart_tx_data),
-        .tx(tx),
-        .ready_out(uart_tx_ready)
-    );
+wire fifo_empty, fifo_full, fifo_wr_en, fifo_rd_en;
+wire [7:0] fifo_wr_data, fifo_rd_data;
+sync_fifo fifo_inst (
+    .clk_in(clk), .n_rst(n_rst), .wr_en(fifo_wr_en), .rd_en(fifo_rd_en),
+    .wr_data_in(fifo_wr_data), .empty(fifo_empty), .full(fifo_full), .rd_data_out(fifo_rd_data)
+);
 
-    // Modulo de teste (testbench) - cuidado: nao eh sintetizavel
-    sync_fifo_tb #(
-        .DATA_BITS(8)
-    ) tb_inst (
-        .clk_in(dev_clk),
-        .n_rst(n_rst_out),
-        .fifo_empty_in(fifo_empty),
-        .fifo_full_in(fifo_full),
-        .uart_rx_valid_in(uart_rx_valid),
-        .uart_tx_ready_in(uart_tx_ready),
-        .uart_rx_data_in(uart_rx_data),
-        .fifo_rd_data_in(fifo_rd_data),
-        .fifo_wr_en(fifo_wr_en),
-        .fifo_rd_en(fifo_rd_en),
-        .uart_tx_en(uart_tx_en),
-        .fifo_wr_data_out(fifo_wr_data),
-        .uart_tx_data_out(uart_tx_data)
-    );
+sync_fifo_tb controller (
+    .clk_in(clk), .n_rst(n_rst),
+    .fifo_empty_in(fifo_empty), .fifo_full_in(fifo_full),
+    .uart_rx_valid_in(uart_rx_valid), .uart_tx_ready_in(uart_tx_ready),
+    .uart_rx_data_in(uart_rx_data), .fifo_rd_data_in(fifo_rd_data),
+    .fifo_wr_en(fifo_wr_en), .fifo_rd_en(fifo_rd_en),
+    .uart_tx_en(uart_tx_en),
+    .fifo_wr_data_out(fifo_wr_data), .uart_tx_data_out(uart_tx_data)
+);
 
-    // LED para debug (pisca quando ha escrita/leitura no FIFO)
-    reg led_reg;
-
-    always @(posedge dev_clk or negedge n_rst_out) begin
-        if (!n_rst_out)
-            led_reg <= 1'b0;
-        else if (fifo_wr_en || fifo_rd_en)
-            led_reg <= ~led_reg;
-    end
-
-    assign led_D2 = led_reg;
+assign led_D2 = 1'b0;  // LED desligado (opcional)
 
 endmodule
