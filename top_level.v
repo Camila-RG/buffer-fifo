@@ -51,7 +51,7 @@ module top_level (
         .clk_in(clk_out),
         .n_rst(n_rst_out),
         .rx(rx),
-        .ready_out(/* não usado */),
+        .ready_out(), // nao usado
         .valid_out(uart_rx_valid),
         .data_out(uart_rx_data)
     );
@@ -70,7 +70,7 @@ module top_level (
         .ready_out(uart_tx_ready)
     );
 
-    // Módulo de teste (testbench)
+    // Modulo de teste (testbench) - cuidado: nao eh sintetizavel
     sync_fifo_tb #(
         .DATA_BITS(8)
     ) tb_inst (
@@ -89,12 +89,16 @@ module top_level (
         .uart_tx_data_out(uart_tx_data)
     );
 
-    // LED para debug (pisca quando há escrita/leitura no FIFO)
-    reg led_reg = 0;
-    always_ff @(posedge dev_clk or negedge n_rst_out) begin
-        if (!n_rst_out) led_reg <= 0;
-        else if (fifo_wr_en || fifo_rd_en) led_reg <= ~led_reg;
+    // LED para debug (pisca quando ha escrita/leitura no FIFO)
+    reg led_reg;
+
+    always @(posedge dev_clk or negedge n_rst_out) begin
+        if (!n_rst_out)
+            led_reg <= 1'b0;
+        else if (fifo_wr_en || fifo_rd_en)
+            led_reg <= ~led_reg;
     end
+
     assign led_D2 = led_reg;
 
 endmodule
