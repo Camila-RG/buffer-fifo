@@ -1,6 +1,6 @@
 # Projeto FIFO com UART
 
-Este projeto implementa um buffer FIFO síncrono integrado com módulos UART para comunicação serial, conforme especificado na aula de 29/07. O sistema preenche o FIFO com valores sequenciais ao receber "w" via UART e esvazia o FIFO transmitindo os dados via UART ao receber "r". O projeto foi desenvolvido para a placa FPGA Colorlight com clock de 25 MHz.
+Este projeto implementa um buffer FIFO síncrono integrado com módulos UART para comunicação serial, conforme especificado na aula de 29/07 e 05/08. O sistema preenche o FIFO com valores sequenciais ao receber "w" via UART e esvazia o FIFO transmitindo os dados via UART ao receber "r". O projeto foi desenvolvido para a placa FPGA Colorlight com clock de 25 MHz.
 
 ## Estrutura do Projeto
 - **Arquivos**:
@@ -16,3 +16,4 @@ Este projeto implementa um buffer FIFO síncrono integrado com módulos UART par
 
 ## Licença
 Este projeto é para fins educacionais, baseado nas especificações da aula de 29/07.
+
